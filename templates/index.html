@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Rice Quality Analyzer</title>
+  
+  <!-- Bootstrap CSS -->
+  <link href="{{ url_for('static', filename='bootstrap.css') }}" rel="stylesheet">
+  
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  
+  <!-- Custom CSS -->
+  <style>
+    :root {
+      --primary-color: #4361ee;
+      --secondary-color: #3f37c9;
+      --success-color: #4cc9f0;
+      --warning-color: #f72585;
+      --danger-color: #ff006e;
+      --light-color: #f8f9fa;
+      --dark-color: #212529;
+    }
+    body {
+      overflow: hidden;
+      height: 100vh;
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+    .main-container {
+      height: 100vh;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+      border-radius: 15px;
+      overflow: hidden;
+      margin: 20px;
+      background: white;
+    }
+    .left-panel {
+      padding: 2rem;
+      height: 100%;
+      background: linear-gradient(to bottom right, #f0f2f5, #e9ecef);
+      border-radius: 15px 0 0 15px;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+    }
+    .right-panel {
+      height: 100%;
+      position: relative;
+      background: #f8f9fa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .image-container {
+      height: 95%;
+      width: 95%;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+      background: #ffffff;
+      padding: 15px;
+    }
+    #displayImage {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto;
+    }
+    h2 {
+      color: var(--primary-color);
+      margin-bottom: 2rem;
+      font-weight: 600;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+    }
+    .btn {
+      border-radius: 10px;
+      padding: 12px 20px;
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+    .btn-primary {
+      background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+      border: none;
+    }
+    .btn-outline-secondary {
+      border: 2px solid #6c757d;
+      color: #6c757d;
+    }
+    .btn-outline-success {
+      border: 2px solid var(--success-color);
+      color: var(--success-color);
+    }
+    .results-container {
+      margin-top: 2rem;
+      padding: 1.5rem;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      flex-grow: 1;
+      overflow-y: auto;
+    }
+    .results-container h5 {
+      color: var(--primary-color);
+      margin-bottom: 1rem;
+      font-weight: 600;
+      border-bottom: 2px solid var(--primary-color);
+      padding-bottom: 0.5rem;
+      display: inline-block;
+    }
+    .results-content {
+      color: var(--dark-color);
+      line-height: 1.6;
+      font-size: 1.5rem
+    }
+    .legend {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      z-index: 1000;
+      max-width: 200px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .legend-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      margin-right: 10px;
+    }
+    .legend-text {
+      font-size: 14px;
+      color: var(--dark-color);
+    }
+    .category-buttons {
+      margin-top: 2rem;
+    }
+    .btn-group {
+      margin-bottom: 1rem;
+      width: 100%;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      background: #d1d8e0;
+      outline: none;
+      margin: 20px 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 24px;
+      height: 24px;
+      background: var(--primary-color);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255,255,255,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      display: none;
+    }
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid var(--light-color);
+      border-top: 5px solid var(--primary-color);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #adb5bd;
+    }
+    .empty-state i {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+      opacity: 0.3;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid main-container p-0">
+    <div class="row g-0 h-100">
+      <!-- Left Panel -->
+      <div class="col-md-4 left-panel">
+        <h2><i class="fas fa-rice"></i> Rice Quality Analyzer</h2>
+        
+        <div class="btn-group">
+          <button onclick="captureImage()" class="btn btn-primary w-100">
+            <i class="fas fa-camera me-2"></i> Capture Image
+          </button>
+        </div>
+
+        <button onclick="retakeImage()" id="retakeButton" class="btn btn-outline-secondary w-100 mb-3 d-none">
+          <i class="fas fa-redo me-2"></i> Retake
+        </button>
+
+        <div class="category-buttons">
+          <button onclick="analyzeSelection()" id="analyzeBtn" class="btn btn-outline-success w-100">
+            <i class="fas fa-microscope me-2"></i> Analyze
+          </button>
+        </div>
+
+        <div class="results-container mt-4">
+          <h5 class="text-center w-100"><i class="fas fa-chart-pie"></i> Analysis Results</h5>
+          <div id="resultsContent" class="results-content">
+            <div class="empty-state">
+              <i class="fas fa-clipboard-list"></i>
+              <p>No results available yet.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div class="col-md-8 right-panel">
+        <div class="image-container">
+          <img id="displayImage" src="{{ url_for('video_feed') }}" class="img-fluid">
+          <div class="loading-overlay" id="loadingOverlay">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-color" style="background-color: rgb(0, 255, 0);"></div>
+      <div class="legend-text">Full Grain Rice</div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background-color: rgb(255, 0, 0);"></div>
+      <div class="legend-text">Broken Rice</div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background-color: rgb(255, 255, 0);"></div>
+      <div class="legend-text">Stones</div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background-color: rgb(255, 0, 255);"></div>
+      <div class="legend-text">Husk</div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS and dependencies -->
+  <script src="{{ url_for('static', filename='bootstrap.bundle.js') }}"></script>
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
