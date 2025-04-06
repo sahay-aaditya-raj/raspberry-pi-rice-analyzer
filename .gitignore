@@ -1,0 +1,17 @@
+# Python virtual environment
+venv/
+
+# Static directories
+static/uploads/
+static/processed/
+static/captured/
+
+# Python cache files
+__pycache__/
+**/__pycache__/
+
+# Optional: Ignore compiled Python files
+*.pyc
+*.pyo
+*.pyd
+
