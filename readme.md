@@ -133,6 +133,6 @@ raspberry-pi-image-processing/
 
 - **Aaditya Raj** - *Hardware Integration, IoT Control, Raspberry Pi Setup, Flask Backend Development, Project Management, Team Lead* - [Aaditya](https://github.com/sahay-aaditya-raj)
 - **Piyush Kheria** - *Rice Segregation and Classification (Broken vs. Full Grain)* - [Shriyansh](https://github.com/alexj)
-- **Shriyansh Agrawal** - *Husk and Stone Detection using Image Processing Techniques* - [Piyush](https://github.com/johnsmith)
+- **Shriyansh Agrawal** - *Husk and Stone Detection using Image Processing Techniques* - [Piyush](https://github.com/pkheria7)
 
 
