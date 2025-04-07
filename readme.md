@@ -36,27 +36,34 @@ A image processing application for rice quality analysis using Raspberry Pi Came
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/yourusername/raspberry-pi-image-processing.git
-   cd raspberry-pi-image-processing
+   git clone https://github.com/yourusername/raspberry-pi-rice-analyzer.git
+   cd raspberry-pi-rice-analyzer
    ```
 
 2. **Install Python Dependencies**
    ```bash
-   pip install -r requirements.txt
+   pip install opencv-python picamera2 numpy matplotlib libcamera
    ```
 
-3. **Enable Camera Interface**
-   - Run `sudo raspi-config`
-   - Navigate to **Interface Options** > **Camera** > **Enable**
-
-4. **Run the Application**
+3. **Run the Application**
    ```bash
    python app.py
    ```
 
-5. **Access the Web Interface**
+4. **Access the Web Interface**
    - Open a web browser and navigate to `http://<raspberry-pi-ip>:5001`
    - Default port is 5001
+
+## Project Working Highlights
+
+![Web Interface](interface.jpg)
+*The responsive web interface showing live camera feed and analysis controls*
+
+![System Setup](setup_image.jpg)
+*Hardware setup with Raspberry Pi 4 and Camera Module 3*
+
+![Results](results.png)
+*Results*
 
 ## Usage
 
@@ -88,14 +95,17 @@ raspberry-pi-image-processing/
 ├── static/                 # Static files
 │   ├── uploads/            # User uploaded images
 │   ├── captured/           # Captured images
-│   └── processed/          # Processed images
+│   ├── processed/          # Processed images
+│   ├── images/             # Documentation images
+│   ├── bootstrap.bundle.js # Client side bootstrap
+│   ├── bootstrap.css       # Client side bootstrap
+│   └── script.js           # Client-side JavaScript
 ├── templates/              # HTML templates
 │   └── index.html          # Main interface
-├── script.js               # Client-side JavaScript
 ├── tests/                  # Test files
 │   ├── test_processing.py  # Image processing tests
 │   └── test_api.py         # API endpoint tests
-└── requirements.txt        # Python dependencies
+└── algo_testing.py         # Testing for algorithm
 ```
 
 ## Image Processing Functions
@@ -112,73 +122,17 @@ raspberry-pi-image-processing/
    - Uses HSV color filtering
    - Validates husk shape using aspect ratio analysis
 
+
 ## API Endpoints
 
 - **GET /video_feed** - Live video stream
 - **POST /capture** - Capture image from camera
 - **POST /process_image** - Process image for object detection
 
-## Testing
-
-### Unit Tests
-
-Run the unit tests with:
-```bash
-python -m pytest tests/
-```
-
-### Image Processing Tests
-
-The system includes comprehensive tests for the image processing algorithms:
-
-1. **Test Images**
-   - The `tests/images/` directory contains sample images with known quantities of rice grains, stones, and husk
-   - Each test image has an accompanying JSON file with expected detection results
-
-2. **Algorithm Testing**
-   - Tests verify the accuracy of detection algorithms across different lighting conditions
-   - Detection thresholds are validated using precision and recall metrics
-
-3. **Performance Testing**
-   - Tests measure processing time for various image resolutions
-   - Memory usage is monitored during batch processing
-
-### Manual Testing
-
-For manually testing image processing quality:
-
-1. Place test images in the `tests/manual/` directory
-2. Run the test script:
-   ```bash
-   python tests/run_manual_tests.py
-   ```
-3. Review the results in the `tests/manual/results/` directory
-
-## Future Improvements
-
-- Add user authentication
-- Implement image export functionality
-- Add historical data storage
-- Improve detection accuracy with machine learning
-- Add mobile-responsive design
-
-## Troubleshooting
-
-- **Camera not detected**: Ensure camera is enabled in raspi-config
-- **Permission errors**: Run with `sudo` or configure proper permissions
-- **Slow processing**: Reduce image resolution or optimize algorithms
-- **Color detection issues**: Calibrate HSV values for your specific lighting conditions
-
 ## Contributors
 
-- **Jane Doe** - *Initial project development, image processing algorithms* - [janedoe](https://github.com/janedoe)
-- **John Smith** - *Front-end interface, Flask API development* - [johnsmith](https://github.com/johnsmith)
-- **Alex Johnson** - *Hardware integration, camera module optimization* - [alexj](https://github.com/alexj)
-- **Mary Williams** - *Documentation, testing framework* - [maryw](https://github.com/maryw)
-- **Robert Chen** - *Performance optimization, HSV color calibration* - [robchen](https://github.com/robchen)
+- **Aaditya Raj** - *Hardware Integration, IoT Control, Raspberry Pi Setup, Flask Backend Development, Project Management, Team Lead* - [Aaditya](https://github.com/sahay-aaditya-raj)
+- **Piyush Kheria** - *Rice Segregation and Classification (Broken vs. Full Grain)* - [Shriyansh](https://github.com/alexj)
+- **Shriyansh Agrawal** - *Husk and Stone Detection using Image Processing Techniques* - [Piyush](https://github.com/johnsmith)
 
-We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
