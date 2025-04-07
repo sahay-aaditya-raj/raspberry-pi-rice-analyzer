@@ -36,7 +36,7 @@ A image processing application for rice quality analysis using Raspberry Pi Came
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/yourusername/raspberry-pi-rice-analyzer.git
+   git clone https://github.com/sahay-aaditya-raj/raspberry-pi-rice-analyzer.git
    cd raspberry-pi-rice-analyzer
    ```
 
