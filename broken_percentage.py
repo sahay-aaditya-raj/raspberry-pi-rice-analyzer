@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import logging
+import os
 
 logging.basicConfig(
     filename='rice_grain_detection_full.log',  # Name of the log file
@@ -69,7 +70,9 @@ def detect_and_count_rice_grains(original_image):
     
     # Initialize counters and storage for full and broken grains
     full_grain_count = 0
-    broken_grain_count = 0
+    broken_grain_count_25 = 0
+    broken_grain_count_50 = 0
+    broken_grain_count_75 = 0
     total_area = 0
     valid_contour_count = 0
     
@@ -79,7 +82,7 @@ def detect_and_count_rice_grains(original_image):
     
     
     # Calculate average area of rice grains
-    average_rice_area = 230
+    average_rice_area = 250
     
     # Classify grains as full or broken based on shape and size
     for label in unique_markers:
@@ -91,34 +94,6 @@ def detect_and_count_rice_grains(original_image):
         
         if contours:
             area = cv2.contourArea(contours[0])
-            M = cv2.moments(contours[0])
-        if M["m00"] != 0:
-            cX = int(M["m10"] / M["m00"])
-            cY = int(M["m01"] / M["m00"])
-            
-            # Get the pixel values in a circle with a radius of 3 pixels
-            # circle_radius = 1
-            # circle_mask = np.zeros(original_image.shape[:2], dtype=np.uint8)
-            # cv2.circle(circle_mask, (cX, cY), circle_radius, 1, -1)  # Create a filled circle mask
-            
-            # Extract the pixel values from the original image using the mask
-            # masked_pixels = original_image[circle_mask == 1]
-            contour_mask = np.zeros(original_image.shape[:2], dtype=np.uint8)
-            cv2.drawContours(contour_mask, contours, -1, 1, thickness=cv2.FILLED)  # Fill the contour
-                
-                # Extract the pixel values from the original image using the mask
-            masked_pixels = original_image[contour_mask == 1]
-            # Calculate the mean RGB value
-            
-
-            if masked_pixels.size > 0:
-                B = masked_pixels.tolist()[0]
-                G = masked_pixels.tolist()[1]
-                R = masked_pixels.tolist()[2]
-                logging.info(f"Pixel values inside contour at ({cX}, {cY}): {masked_pixels.tolist()}")
-                print(f"Pixel values inside contour at ({cX}, {cY}): {masked_pixels.tolist()}")
-            mean_rgb = masked_pixels.mean(axis=0)
-            logging.info(f"Mean RGB value at contour center ({cX}, {cY}): {mean_rgb}")
             try:
                 # Calculate eccentricity for shape analysis
                 (center, (major_axis, minor_axis), angle) = cv2.fitEllipse(contours[0])
@@ -133,14 +108,20 @@ def detect_and_count_rice_grains(original_image):
             if area > 2 * average_rice_area:
                 grain_multiplier = area // average_rice_area - 1
                 total_grain_count += grain_multiplier
-            
             # Classify as full or broken grain
-            if eccentricity >= 0.84 or area > 0.4 * average_rice_area:
+            
+            if eccentricity >= 0.84 and area > 0.8 * average_rice_area:
                 full_grain_count += 1 + grain_multiplier
                 full_contours.extend(contours)
+            elif area<= 0.25*average_rice_area:
+                broken_grain_count_75 += 1 + grain_multiplier
+                cv2.drawContours(visualization_copy, contours, -1, (0, 0, 255), thickness=cv2.FILLED)
+            elif area <= 0.5 * average_rice_area:
+                broken_grain_count_50 += 1 + grain_multiplier
+                cv2.drawContours(visualization_copy, contours, -1, (0, 250, 255), thickness=cv2.FILLED)
             else:
-                broken_grain_count += 1 + grain_multiplier
-                broken_contours.extend(contours)
+                broken_grain_count_25 += 1 + grain_multiplier
+                cv2.drawContours(visualization_copy, contours, -1, (200, 0, 255), thickness=cv2.FILLED)
     
     # Draw contours on the visualization copy
     if full_contours:
@@ -151,26 +132,41 @@ def detect_and_count_rice_grains(original_image):
     return (
         visualization_copy,
         full_grain_count,
-        broken_grain_count,
+        broken_grain_count_25,
+        broken_grain_count_50,
+        broken_grain_count_75,
         average_rice_area
     )
 
 if __name__ == "__main__":
-    # Load an image (replace 'path_to_image.jpg' with your actual image path)
-    original_image = cv2.imread('images/everything1.jpg')
-    
-    # Call the function to detect and count rice grains
-    results = detect_and_count_rice_grains(original_image)
-    
-    # Unpack the results
-    visualization_copy, full_grain_count, broken_grain_count, average_rice_area = results
-    
-    # Print the results
-    print(f"Full grain count: {full_grain_count}")
-    print(f"Broken grain count: {broken_grain_count}")
-    print(f"Average rice area: {average_rice_area}")
-    
-    # Display the image with contours
-    cv2.imshow("Rice Grains Detection", visualization_copy)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # Specify the directory containing the images
+    image_directory = 'images/'  # Adjust this path to your images folder
+
+    # Loop through all files in the directory
+    for filename in os.listdir(image_directory):
+        # Check if the file is an image (you can add more extensions if needed)
+        if filename.endswith(('.jpg', '.jpeg', '.png', '.bmp')):
+            # Construct the full file path
+            image_path = os.path.join(image_directory, filename)
+            
+            # Load the image
+            original_image = cv2.imread(image_path)
+            
+            # Call the function to detect and count rice grains
+            results = detect_and_count_rice_grains(original_image)
+            
+            # Unpack the results
+            visualization_copy, full_grain_count,b25,b50,b75, average_rice_area = results
+            
+            # Print the results for the current image
+            print(f"Results for {filename}:")
+            print(f"Full grain count: {full_grain_count}")
+            print(f"Broken grain count: {b25,b50,b75}")
+            print(f"Average rice area: {average_rice_area}")
+            print("\n")
+
+            # Optionally, display the image with contours
+            cv2.imshow(f"Rice Grains Detection - {filename}", visualization_copy)
+            cv2.waitKey(0)  # Wait for a key press to move to the next image
+
+    cv2.destroyAllWindows()  # Close all OpenCV windows after processing
