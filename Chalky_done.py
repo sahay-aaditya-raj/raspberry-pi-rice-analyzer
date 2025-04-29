@@ -122,9 +122,10 @@ def detect_and_count_rice_grains(original_image):
             # Classify as full or broken grain
             if count_above_threshold>0:
                 chalky_count+=1
+                full_contours.extend(contours)
             elif eccentricity >= 0.84 and area > 0.4 * average_rice_area:
                 full_grain_count += 1 + grain_multiplier
-                full_contours.extend(contours)
+                
             else:
                 broken_grain_count += 1 + grain_multiplier
                 broken_contours.extend(contours)
@@ -146,7 +147,7 @@ def detect_and_count_rice_grains(original_image):
 
 if __name__ == "__main__":
     # Load an image (replace 'path_to_image.jpg' with your actual image path)
-    original_image = cv2.imread('images/allbroken1.jpg')
+    original_image = cv2.imread('images/allchalky1.jpg')
     
     # Call the function to detect and count rice grains
     results = detect_and_count_rice_grains(original_image)
