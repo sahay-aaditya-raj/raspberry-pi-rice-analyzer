@@ -62,13 +62,10 @@ def detect_and_count_rice_grains(original_image):
     full_grain_count = 0
     broken_grain_count = 0
     chalky_count =0
+    black_count = 0
     yellow_count = 0
+    brown_count = 0
 
-    
-    # Lists to store full and broken grain contours
-    full_contours = []
-    broken_contours = []
-    
     # Calculate average area of rice grains
     average_rice_area = 250
     
@@ -76,89 +73,105 @@ def detect_and_count_rice_grains(original_image):
     mean_rgb_values = []
     min_rgb_values = []
     
-    # Classify grains as full or broken based on shape and size
-    for label in unique_markers:
-        if label <= 1:  # Skip background and boundary
-            continue
-        grain_mask = np.zeros(grayscale_image.shape, dtype="uint8")
-        grain_mask[markers == label] = 255
-        contours, _ = cv2.findContours(grain_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        if contours:
-            area = cv2.contourArea(contours[0])
-            M = cv2.moments(contours[0])
-            if M["m00"] != 0:
-                cX = int(M["m10"] / M["m00"])
-                cY = int(M["m01"] / M["m00"])
-                
-                # Extract the pixel values in a circle with a radius of 3 pixels
-                circle_radius = 3
-                circle_mask = np.zeros(original_image.shape[:2], dtype=np.uint8)
-                cv2.circle(circle_mask, (cX, cY), circle_radius, 1, -1)  # Create a filled circle mask
+    # Open a CSV file for writing
+    with open('rice_grains_data.csv', mode='w', newline='') as csv_file:
+        writer = csv.writer(csv_file)
+        # Write the header
+        writer.writerow(['Contour Number', 'Pixel Values', 'Mean RGB', 'Min RGB'])
+
+        label = 1
+        # Classify grains as full or broken based on shape and size
+        for label in unique_markers:
+            if label <= 1:  # Skip background and boundary
+                continue
+            grain_mask = np.zeros(grayscale_image.shape, dtype="uint8")
+            grain_mask[markers == label] = 255
+            contours, _ = cv2.findContours(grain_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            if contours:
+                area = cv2.contourArea(contours[0])
+                M = cv2.moments(contours[0])
+                if M["m00"] != 0:
+                    cX = int(M["m10"] / M["m00"])
+                    cY = int(M["m01"] / M["m00"])
+                    
+                    # Extract the pixel values in a circle with a radius of 3 pixels
+                    circle_radius = 3
+                    circle_mask = np.zeros(original_image.shape[:2], dtype=np.uint8)
+                    cv2.circle(circle_mask, (cX, cY), circle_radius, 1, -1)  # Create a filled circle mask
+                    
+                    # Extract the pixel values from the original image using the mask
+                    masked_pixels = original_image[circle_mask == 1]
+                    
+                    # Calculate the mean RGB value
+                    if masked_pixels.size > 0:
+                        mean_rgb = masked_pixels.mean(axis=0)
+                        min_rgb = masked_pixels.min(axis=0)
+                        mean_rgb_values.append(mean_rgb)
+                        min_rgb_values.append(min_rgb)
+
+                        # Write the pixel values, mean RGB, and min RGB to the CSV
+                        pixel_values_str = masked_pixels.tolist()  # Convert to list for CSV
+                        writer.writerow([label, pixel_values_str, mean_rgb.tolist(), min_rgb.tolist()])  # Write data
+
+                    cv2.putText(visualization_copy, str(label), (cX, cY), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
+                    label +=1
+
+                # Extract the pixel values from the original image using the mask
+                contour_mask = np.zeros(original_image.shape[:2], dtype=np.uint8)
+                cv2.drawContours(contour_mask, contours, -1, 1, thickness=cv2.FILLED)  # Fill the contour
                 
                 # Extract the pixel values from the original image using the mask
-                masked_pixels = original_image[circle_mask == 1]
-                
+                masked_pixels = original_image[contour_mask == 1]
                 # Calculate the mean RGB value
-                if masked_pixels.size > 0:
-                    mean_rgb = masked_pixels.mean(axis=0)
-                    min_rgb = masked_pixels.min(axis=0)
-                    min_rgb_values.append(min_rgb)
-                    mean_rgb_values.append(mean_rgb)
-                print(min_rgb_values)
+                
+                count_for_chalky = np.sum(np.all(masked_pixels >= [230, 195, 195], axis=1))
+                count_for_black = np.sum(np.all(masked_pixels <= [140, 80, 90], axis=1))
+                mean_rgb = masked_pixels.mean(axis=0)
+                count_for_yellow = np.sum(
+                    np.all(masked_pixels >= [140, 140, 130], axis=1) &
+                    np.all(masked_pixels <= [170, 160, 150], axis=1))
+                count_for_brown = np.sum(
+                    np.all(masked_pixels >= [90, 70, 100], axis=1) &
+                    np.all(masked_pixels <= [110, 95, 125], axis=1))
 
-            # Extract the pixel values from the original image using the mask
-            contour_mask = np.zeros(original_image.shape[:2], dtype=np.uint8)
-            cv2.drawContours(contour_mask, contours, -1, 1, thickness=cv2.FILLED)  # Fill the contour
+
+                mean_rgb = masked_pixels.mean(axis=0)
+                try:
+                    # Calculate eccentricity for shape analysis
+                    (center, (major_axis, minor_axis), angle) = cv2.fitEllipse(contours[0])
+                    major = max(major_axis, minor_axis)
+                    minor = min(major_axis, minor_axis)
+                    eccentricity = np.sqrt(1 - (minor)**2 / (major)**2)
+                except:
+                    eccentricity = 0
                 
-            # Extract the pixel values from the original image using the mask
-            masked_pixels = original_image[contour_mask == 1]
-            # Calculate the mean RGB value
-            
-            count_above_threshold = np.sum(np.all(masked_pixels >= [230, 200, 200], axis=1))
-            if masked_pixels.size > 0:
-                B = masked_pixels.tolist()[0]
-                G = masked_pixels.tolist()[1]
-                R = masked_pixels.tolist()[2]
-                # logging.info(f"Pixel values inside contour at ({cX}, {cY}): {masked_pixels.tolist()}")
-                print(f"Pixel values inside contour at ({cX}, {cY}): {masked_pixels.tolist()}")
-            mean_rgb = masked_pixels.mean(axis=0)
-            try:
-                # Calculate eccentricity for shape analysis
-                (center, (major_axis, minor_axis), angle) = cv2.fitEllipse(contours[0])
-                major = max(major_axis, minor_axis)
-                minor = min(major_axis, minor_axis)
-                eccentricity = np.sqrt(1 - (minor)**2 / (major)**2)
-            except:
-                eccentricity = 0
-            
-            # Handle overlapping or clustered grains
-            grain_multiplier = 0
-            if area > 2 * average_rice_area:
-                grain_multiplier = area // average_rice_area - 1
-                total_grain_count += grain_multiplier
-            
-            # Classify as full or broken grain
-            if count_above_threshold>4:
-                chalky_count+=1
-                cv2.drawContours(visualization_copy, contours, -1, (0, 255, 255), thickness=cv2.FILLED)
-            elif eccentricity >= 0.84 and area > 0.4 * average_rice_area:
-                full_grain_count += 1 + grain_multiplier
-                # full_contours.extend(contours)
-                cv2.drawContours(visualization_copy, contours, -1, (0, 255, 0), thickness=cv2.FILLED)
+                # Handle overlapping or clustered grains
+                grain_multiplier = 0
+                if area > 2 * average_rice_area:
+                    grain_multiplier = area // average_rice_area - 1
+                    total_grain_count += grain_multiplier
                 
-            else:
-                broken_grain_count += 1 + grain_multiplier
-                # broken_contours.extend(contours)
-                cv2.drawContours(visualization_copy, contours, -1, (0, 0, 255), thickness=cv2.FILLED)
+                # Classify as full or broken grain
+                if count_for_black > 10:
+                    black_count+=1
+                    cv2.drawContours(visualization_copy, contours, -1, (10, 10, 10), thickness=cv2.FILLED)
+                if count_for_brown >=5 :
+                    brown_count+=1
+                    cv2.drawContours(visualization_copy, contours, -1, (0, 128, 255), thickness=cv2.FILLED)
+                elif count_for_chalky>4:
+                    chalky_count+=1
+                    cv2.drawContours(visualization_copy, contours, -1, (0, 255, 255), thickness=cv2.FILLED)
+                elif count_for_yellow >13:
+                    yellow_count +=1
+                    cv2.drawContours(visualization_copy, contours, -1, (0, 102, 51), thickness=cv2.FILLED)
+                elif eccentricity >= 0.84 and area > 0.4 * average_rice_area:
+                    full_grain_count += 1 + grain_multiplier
+                    cv2.drawContours(visualization_copy, contours, -1, (0, 255, 0), thickness=cv2.FILLED) 
+                else:
+                    broken_grain_count += 1 + grain_multiplier
+                    cv2.drawContours(visualization_copy, contours, -1, (0, 0, 255), thickness=cv2.FILLED)
     
-    # Draw contours on the visualization copy
-    if full_contours:
-        cv2.drawContours(visualization_copy, full_contours, -1, (0, 255, 0), thickness=cv2.FILLED)  # Green for full grains
-    elif broken_contours:
-        cv2.drawContours(visualization_copy, broken_contours, -1, (0, 0, 255), thickness=cv2.FILLED)  # Red for broken grains
-     # Write mean RGB values
-
     return (
         visualization_copy,
         full_grain_count,
@@ -169,7 +182,7 @@ def detect_and_count_rice_grains(original_image):
 
 if __name__ == "__main__":
     # Load an image (replace 'path_to_image.jpg' with your actual image path)
-    original_image = cv2.imread('images/everything1.jpg')
+    original_image = cv2.imread('images/allblack1.jpg')
     
     # Call the function to detect and count rice grains
     results = detect_and_count_rice_grains(original_image)
