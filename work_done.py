@@ -109,10 +109,6 @@ def detect_and_count_rice_grains(original_image):
             count_for_yellow = np.sum(
                 np.all(masked_pixels >= [140, 140, 130], axis=1) &
                 np.all(masked_pixels <= [170, 160, 150], axis=1))
-            count_for_brown = np.sum(
-                np.all(masked_pixels >= [90, 70, 100], axis=1) &
-                np.all(masked_pixels <= [110, 95, 125], axis=1))
-
             try:
                 # Calculate eccentricity for shape analysis
                 (center, (major_axis, minor_axis), angle) = cv2.fitEllipse(contours[0])
@@ -132,9 +128,6 @@ def detect_and_count_rice_grains(original_image):
             if count_for_black > 10:
                 black_count+=1
                 cv2.drawContours(visualization_copy, contours, -1, (10, 10, 10), thickness=cv2.FILLED)
-            elif count_for_brown >=5 :
-                brown_count+=1
-                cv2.drawContours(visualization_copy, contours, -1, (0, 128, 255), thickness=cv2.FILLED)
             elif count_for_yellow >= 10:
                 yellow_count +=1
                 cv2.drawContours(visualization_copy, contours, -1, (0, 102, 51), thickness=cv2.FILLED)
