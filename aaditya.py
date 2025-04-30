@@ -18,7 +18,9 @@ def detect_and_count_rice_grains(original_image):
     # Create a copy of the original image for visualization
     visualization_copy = original_image.copy()
     
+    # Convert to HSV for processing 
     hsv = cv2.cvtColor(original_image,cv2.COLOR_BGR2HSV)
+
     # Convert to grayscale for processing
     grayscale_image = cv2.cvtColor(hsv, cv2.COLOR_BGR2GRAY)
     
@@ -27,16 +29,9 @@ def detect_and_count_rice_grains(original_image):
         grayscale_image, 0, 255, 
         cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     
-    # Invert the binary image to highlight rice grains
-    inverted_binary = binary_image
-
-    cv2.imshow("Lets see",inverted_binary)
-
     # Morphological operations to clean the image
     morphological_kernel = np.ones((3, 3), np.uint8)
-    cleaned_image = cv2.morphologyEx(inverted_binary, cv2.MORPH_OPEN, morphological_kernel, iterations=2)
-    
-    cv2.imshow("Cleaned image :",cleaned_image)
+    cleaned_image = cv2.morphologyEx(binary_image, cv2.MORPH_OPEN, morphological_kernel, iterations=2)
 
     # Background extraction
     background = cv2.dilate(cleaned_image, morphological_kernel, iterations=3)
@@ -67,6 +62,8 @@ def detect_and_count_rice_grains(original_image):
     full_grain_count = 0
     broken_grain_count = 0
     chalky_count =0
+    yellow_count = 0
+
     
     # Lists to store full and broken grain contours
     full_contours = []
@@ -119,6 +116,13 @@ def detect_and_count_rice_grains(original_image):
             # Calculate the mean RGB value
             
             count_above_threshold = np.sum(np.all(masked_pixels >= [230, 200, 200], axis=1))
+            if masked_pixels.size > 0:
+                B = masked_pixels.tolist()[0]
+                G = masked_pixels.tolist()[1]
+                R = masked_pixels.tolist()[2]
+                # logging.info(f"Pixel values inside contour at ({cX}, {cY}): {masked_pixels.tolist()}")
+                print(f"Pixel values inside contour at ({cX}, {cY}): {masked_pixels.tolist()}")
+            mean_rgb = masked_pixels.mean(axis=0)
             try:
                 # Calculate eccentricity for shape analysis
                 (center, (major_axis, minor_axis), angle) = cv2.fitEllipse(contours[0])
