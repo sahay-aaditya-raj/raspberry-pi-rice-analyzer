@@ -72,7 +72,7 @@ def detect_and_count_rice_grains(original_image):
     brown_count = 0
     
     # Calculate average area of rice grains
-    average_rice_area = 250
+    average_rice_area = 225
     
     # Initialize a list to store mean RGB values
     mean_rgb_values = []
@@ -107,15 +107,18 @@ def detect_and_count_rice_grains(original_image):
             
             # Extract the pixel values from the original image using the mask
             masked_pixels = original_image[contour_mask == 1]
+            sorted_bgr = masked_pixels[np.lexsort((masked_pixels[:, 2], masked_pixels[:, 1], masked_pixels[:, 0]))]
+            masked_pixels = sorted_bgr[5:-5]
             # Calculate the mean RGB value
             
-            count_for_chalky = np.sum(np.all(masked_pixels >= [230, 200, 200], axis=1))
-            count_for_black = np.sum(np.all(masked_pixels <= [140, 105, 105], axis=1))
+            count_for_chalky = np.sum(np.all(masked_pixels >= [220, 200, 190], axis=1) & (np.abs(masked_pixels[:, 0] - masked_pixels[:, 2]) < 40))
+            count_for_black = np.sum(np.all(masked_pixels <= [150, 130, 140], axis=1))
             count_for_yellow = np.sum(
-                np.all(masked_pixels >= [140, 140, 130], axis=1) &
-                np.all(masked_pixels <= [170, 170, 170], axis=1))
+                (np.all(masked_pixels >= [155, 145, 145], axis=1) &
+                np.all(masked_pixels <= [200, 180, 180], axis=1)) &
+                (np.abs(masked_pixels[:, 0] - masked_pixels[:, 2]) < 30))
             count_for_brown = np.sum(
-                    np.all(masked_pixels >= [90, 70, 100], axis=1) &
+                    np.all(masked_pixels >= [95, 75, 105], axis=1) &
                     np.all(masked_pixels <= [110, 95, 125], axis=1))
             try:
                 # Calculate eccentricity for shape analysis
@@ -133,19 +136,19 @@ def detect_and_count_rice_grains(original_image):
                 total_grain_count += grain_multiplier
             
             # Classify as full or broken grain
-            if count_for_brown > 5 :
-                brown_count += 1 + grain_multiplier
-                cv2.drawContours(visualization_copy, contours, -1, (0, 128, 255), thickness=cv2.FILLED)
-            elif count_for_yellow >= 10:
-                yellow_count +=1 + grain_multiplier
-                cv2.drawContours(visualization_copy, contours, -1, (0, 102, 51), thickness=cv2.FILLED)
-            elif count_for_black > 10:
-                black_count+=1 + grain_multiplier
-                cv2.drawContours(visualization_copy, contours, -1, (10, 10, 10), thickness=cv2.FILLED)
-            elif count_for_chalky>4:
+            if count_for_chalky>=4:
                 chalky_count+=1 + grain_multiplier
                 cv2.drawContours(visualization_copy, contours, -1, (0, 255, 255), thickness=cv2.FILLED)
-            elif eccentricity >= 0.84 and area > 0.4 * average_rice_area:
+            elif count_for_brown >= 5 :
+                brown_count += 1 + grain_multiplier
+                cv2.drawContours(visualization_copy, contours, -1, (0, 128, 255), thickness=cv2.FILLED)         
+            elif count_for_yellow >= 9:
+                yellow_count +=1 + grain_multiplier
+                cv2.drawContours(visualization_copy, contours, -1, (0, 102, 51), thickness=cv2.FILLED)
+            elif count_for_black >= 7:
+                black_count+=1 + grain_multiplier
+                cv2.drawContours(visualization_copy, contours, -1, (10, 10, 10), thickness=cv2.FILLED)
+            elif eccentricity >= 0.84 and area > 0.6 * average_rice_area:
                 full_grain_count += 1 + grain_multiplier
                 cv2.drawContours(visualization_copy, contours, -1, (0, 255, 0), thickness=cv2.FILLED) 
             else:
@@ -153,13 +156,13 @@ def detect_and_count_rice_grains(original_image):
                 area_ratio = area / average_rice_area
                 if area_ratio > 0.45:
                     broken_25_count += 1
-                    cv2.drawContours(visualization_copy, contours, -1, (35, 101, 68), thickness=cv2.FILLED)
+                    cv2.drawContours(visualization_copy, contours, -1, (0, 0, 255), thickness=cv2.FILLED)
                 elif area_ratio > 0.3:
                     broken_50_count += 1
-                    cv2.drawContours(visualization_copy, contours, -1, (92, 54, 61), thickness=cv2.FILLED)
+                    cv2.drawContours(visualization_copy, contours, -1, (0, 0, 255), thickness=cv2.FILLED)
                 else:
                     broken_75_count += 1
-                    cv2.drawContours(visualization_copy, contours, -1, (219, 219, 255), thickness=cv2.FILLED)
+                    cv2.drawContours(visualization_copy, contours, -1, (0, 0, 255), thickness=cv2.FILLED)
             percentage_list = {
                 '25%': broken_25_count,
                 '50%': broken_50_count,
