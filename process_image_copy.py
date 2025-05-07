@@ -288,14 +288,14 @@ def process_image(input_image):
     _, full_grain_count, broken_grain_count, chalky_count, black_count, yellow_count, brown_count, percent_list = detect_and_count_rice_grains(result_image)
     
     
-    
-    
-    # Calculate total objects count
-    total_objects =  + broken_grain_count + stone_count + husk_count
-    
     return (
         result_image,
-        int(total_objects),
+        int(full_grain_count),
+        int(chalky_count) ,
+        int(black_count),
+        int(yellow_count),
+        int(brown_count),
+        percent_list,
         int(broken_grain_count),
         int(stone_count),
         int(husk_count)
@@ -307,13 +307,19 @@ if __name__ == "__main__":
     input_image = cv2.imread(image_path)
     
     if input_image is not None:
-        result_image, total_objects, full_grains, broken_grains, stones, husk = process_image(input_image)
-        
-        print(f"Total objects: {total_objects}")
-        print(f"Full grains: {full_grains}")
-        print(f"Broken grains: {broken_grains}")
-        print(f"Stones: {stones}")
-        print(f"Husk: {husk}")
+        result_image, full_grain_count, chalky_count, black_count, yellow_count, brown_count, percent_list, broken_grain_count, stone_count, husk_count = process_image()
+
+    # Print the returned values
+        print("Result Image:", result_image)
+        print("Full Grain Count:", full_grain_count)
+        print("Chalky Count:", chalky_count)
+        print("Black Count:", black_count)
+        print("Yellow Count:", yellow_count)
+        print("Brown Count:", brown_count)
+        print("Percent List:", percent_list)
+        print("Broken Grain Count:", broken_grain_count)
+        print("Stone Count:", stone_count)
+        print("Husk Count:", husk_count)
         
         # Display the result
         cv2.imshow('Processed Image', result_image)
