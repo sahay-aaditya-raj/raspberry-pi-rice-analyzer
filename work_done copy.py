@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import csv  # Import the csv module
 
 def detect_and_count_rice_grains(original_image):
     """
@@ -59,11 +60,7 @@ def detect_and_count_rice_grains(original_image):
     
     # Initialize counters and storage for full and broken grains
     full_grain_count = 0
-    broken_25_count = 0
-    broken_50_count = 0
-    broken_75_count = 0
     broken_grain_count = 0
-    percentage_list = {}
     chalky_count =0
     black_count = 0
     yellow_count = 0
@@ -71,8 +68,12 @@ def detect_and_count_rice_grains(original_image):
     
     # Calculate average area of rice grains
     average_rice_area = 250
-
-    # Classify grains as full or broken based on shape and size
+    
+    # Initialize a list to store mean RGB values
+    mean_rgb_values = []
+    min_rgb_values = []
+    
+        # Classify grains as full or broken based on shape and size
     for label in unique_markers:
         if label <= 1:  # Skip background and boundary
             continue
@@ -83,6 +84,18 @@ def detect_and_count_rice_grains(original_image):
         if contours:
             area = cv2.contourArea(contours[0])
             M = cv2.moments(contours[0])
+            if M["m00"] != 0:
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+                
+                # Extract the pixel values in a circle with a radius of 3 pixels
+                circle_radius = 3
+                circle_mask = np.zeros(original_image.shape[:2], dtype=np.uint8)
+                cv2.circle(circle_mask, (cX, cY), circle_radius, 1, -1)  # Create a filled circle mask
+                
+                # Extract the pixel values from the original image using the mask
+                masked_pixels = original_image[circle_mask == 1]
+
             # Extract the pixel values from the original image using the mask
             contour_mask = np.zeros(original_image.shape[:2], dtype=np.uint8)
             cv2.drawContours(contour_mask, contours, -1, 1, thickness=cv2.FILLED)  # Fill the contour
@@ -95,7 +108,7 @@ def detect_and_count_rice_grains(original_image):
             count_for_black = np.sum(np.all(masked_pixels <= [140, 105, 105], axis=1))
             count_for_yellow = np.sum(
                 np.all(masked_pixels >= [140, 140, 130], axis=1) &
-                np.all(masked_pixels <= [170, 170, 170], axis=1))
+                np.all(masked_pixels <= [170, 160, 150], axis=1))
             count_for_brown = np.sum(
                     np.all(masked_pixels >= [90, 70, 100], axis=1) &
                     np.all(masked_pixels <= [110, 95, 125], axis=1))
@@ -132,22 +145,7 @@ def detect_and_count_rice_grains(original_image):
                 cv2.drawContours(visualization_copy, contours, -1, (0, 255, 0), thickness=cv2.FILLED) 
             else:
                 broken_grain_count += 1 + grain_multiplier
-                area_ratio = area / average_rice_area
-                if area_ratio > 0.45:
-                    broken_25_count += 1
-                    cv2.drawContours(visualization_copy, contours, -1, (35, 101, 68), thickness=cv2.FILLED)
-                elif area_ratio > 0.3:
-                    broken_50_count += 1
-                    cv2.drawContours(visualization_copy, contours, -1, (92, 54, 61), thickness=cv2.FILLED)
-                else:
-                    broken_75_count += 1
-                    cv2.drawContours(visualization_copy, contours, -1, (219, 219, 255), thickness=cv2.FILLED)
-            percentage_list = {
-                '25%': broken_25_count,
-                '50%': broken_50_count,
-                '75%': broken_75_count
-            }
-                
+                cv2.drawContours(visualization_copy, contours, -1, (0, 0, 255), thickness=cv2.FILLED)
     
     return (
         visualization_copy,
@@ -156,19 +154,18 @@ def detect_and_count_rice_grains(original_image):
         chalky_count,
         black_count,
         yellow_count,
-        brown_count,
-        percentage_list
+        brown_count
     )
 
 if __name__ == "__main__":
     # Load an image (replace 'path_to_image.jpg' with your actual image path)
-    original_image = cv2.imread('images/allbroken1.jpg')
+    original_image = cv2.imread('images/yellow1.jpg')
     
     # Call the function to detect and count rice grains
     results = detect_and_count_rice_grains(original_image)
     
     # Unpack the results
-    visualization_copy, full_grain_count, broken_grain_count, chalky_count, black_count, yellow_count, brown_count, percent_list = results
+    visualization_copy, full_grain_count, broken_grain_count, chalky_count, black_count, yellow_count, brown_count = results
     
     # Print the results
     print(f"Full grain count: {full_grain_count}")
@@ -177,7 +174,6 @@ if __name__ == "__main__":
     print(f"Brown rice count: {brown_count}")
     print(f"yellow rice count :{yellow_count}")
     print(f"black rice count :{black_count}")
-    print(f"percent : {percent_list}")
     
     # Display the image with contours
     cv2.imshow("Rice Grains Detection", visualization_copy)
@@ -188,5 +184,5 @@ if __name__ == "__main__":
 # orange is for brown
 # olive is for yellow
 # green is full 
-# red is broken { inside also we have light pink and other colours}
+# red is broken 
 # yellow means chalky

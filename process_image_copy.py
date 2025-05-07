@@ -1,7 +1,5 @@
 import cv2
 import numpy as np
-import os
-
 
 def detect_and_count_rice_grains(original_image):
     """
@@ -177,37 +175,149 @@ def detect_and_count_rice_grains(original_image):
         percentage_list
     )
 
-if __name__ == "__main__":
-    # Define the path to the images folder
-    images_folder = 'images'
-    # Loop through all files in the images folder
-    for image_file in os.listdir(images_folder):
-        if image_file.endswith(('.jpg', '.jpeg', '.png')):  # Check for image file types
-            image_path = os.path.join(images_folder, image_file)
-            original_image = cv2.imread(image_path)
-            
-            # Call the function to detect and count rice grains
-            results = detect_and_count_rice_grains(original_image)
-            
-            visualization_copy, full_grain_count, broken_grain_count, chalky_count, black_count, yellow_count, brown_count, percent_list = results
-    
-            # Print the results
-            print(f"Full grain count: {full_grain_count}")
-            print(f"Broken grain count: {broken_grain_count}")
-            print(f"chalky count :{chalky_count}")
-            print(f"Brown rice count: {brown_count}")
-            print(f"yellow rice count :{yellow_count}")
-            print(f"black rice count :{black_count}")
-            print(f"percent : {percent_list}")
-            
-            # Display the image with contours
-            cv2.imshow(f"Rice Grains Detection - {image_file}", visualization_copy)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
 
-# black is for black
-# orange is for brown
-# olive is for yellow
-# green is full 
-# red is broken 
-# yellow means chalky
+def detect_stones(image):
+    """
+    Detects stones in an image using HSV color space filtering and applies a dark blue mask.
+
+    Args:
+        image (numpy array): Input image containing potential stones.
+
+    Returns:
+        tuple: Image with stones highlighted in dark blue, stone count, and total stone area.
+    """
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    lower_stone_color = np.array([5, 50, 50])
+    upper_stone_color = np.array([25, 255, 200])
+    stone_mask = cv2.inRange(hsv_image, lower_stone_color, upper_stone_color)
+    morphological_kernel = np.ones((3, 3), np.uint8)
+    cleaned_stone_mask = cv2.morphologyEx(stone_mask, cv2.MORPH_CLOSE, morphological_kernel, iterations=2)
+    stone_contours, _ = cv2.findContours(cleaned_stone_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    stone_count = 0
+    total_stone_area = 0
+    result_image = image.copy()
+
+    for contour in stone_contours:
+        area = cv2.contourArea(contour)
+        if area > 20:
+            if len(contour) >= 5:
+                ellipse = cv2.fitEllipse(contour)
+                (center, axes, angle) = ellipse
+                major_axis, minor_axis = max(axes), min(axes)
+                aspect_ratio = major_axis / minor_axis if minor_axis != 0 else 0
+                if 1.0 <= aspect_ratio <= 2.0:
+                    stone_count += 1
+                    total_stone_area += area
+                    mask = np.zeros(image.shape[:2], dtype=np.uint8)
+                    cv2.drawContours(mask, [contour], 0, 255, thickness=cv2.FILLED)
+                    # Use a larger kernel and more iterations for stronger dilation
+                    dilated_mask = cv2.dilate(mask, np.ones((7, 7), np.uint8), iterations=2)
+                    result_image[dilated_mask == 255] = (139, 0, 0)
+
+
+
+    return result_image, stone_count, total_stone_area
+
+
+
+def detect_husk(image):
+    """
+    Detects husk in an image using HSV color space filtering and applies a dark blue mask.
+
+    Args:
+        image (numpy array): Input image containing potential husk.
+
+    Returns:
+        tuple: Image with husk highlighted in dark blue, husk count, and total husk area.
+    """
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    lower_husk_color = np.array([10, 30, 50])
+    upper_husk_color = np.array([30, 180, 220])
+    husk_mask = cv2.inRange(hsv_image, lower_husk_color, upper_husk_color)
+    morphological_kernel = np.ones((3, 3), np.uint8)
+    cleaned_husk_mask = cv2.morphologyEx(husk_mask, cv2.MORPH_CLOSE, morphological_kernel, iterations=2)
+    husk_contours, _ = cv2.findContours(cleaned_husk_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    husk_count = 0
+    total_husk_area = 0
+    result_image = image.copy()
+
+    for contour in husk_contours:
+        area = cv2.contourArea(contour)
+        if area > 20:
+            x, y, width, height = cv2.boundingRect(contour)
+            aspect_ratio = float(width) / height
+            if 0.2 < aspect_ratio < 0.7 or aspect_ratio > 1.5:
+                husk_count += 1
+                total_husk_area += area
+                mask = np.zeros(image.shape[:2], dtype=np.uint8)
+                cv2.drawContours(mask, [contour], -1, 255, thickness=cv2.FILLED)
+                dilated_mask = cv2.dilate(mask, np.ones((5, 5), np.uint8), iterations=1)
+                result_image[dilated_mask == 255] = (139, 0, 0)
+
+
+    return result_image, husk_count, total_husk_area
+
+
+def process_image(input_image):
+    """
+    Processes an image to identify and visualize different components (rice, stones, husk).
+    
+    Args:
+        input_image (numpy array): Input image containing rice and potential impurities.
+        
+    Returns:
+        tuple: Processed image with masks applied, and counts of various components.
+    """
+    if input_image is None:
+        raise ValueError("Could not read image")
+    
+    # Create a copy of the original image for visualization
+    result_image = input_image.copy()
+
+    stone_image, stone_count, stone_area = detect_stones(input_image)
+    husk_image, husk_count, husk_area = detect_husk(input_image)
+
+    stone_mask = cv2.inRange(stone_image, (139, 0, 0), (139, 0, 0))
+    result_image[stone_mask == 255] = [139, 0, 0]
+    husk_mask = cv2.inRange(husk_image, (139, 0, 0), (139, 0, 0))
+    result_image[husk_mask == 255] = [139, 0, 0]
+    
+    # Detect rice grains
+    _, full_grain_count, broken_grain_count, chalky_count, black_count, yellow_count, brown_count, percent_list = detect_and_count_rice_grains(result_image)
+    
+    
+    
+    
+    # Calculate total objects count
+    total_objects =  + broken_grain_count + stone_count + husk_count
+    
+    return (
+        result_image,
+        int(total_objects),
+        int(broken_grain_count),
+        int(stone_count),
+        int(husk_count)
+    )
+
+# Test the function
+if __name__ == "__main__":
+    image_path = '/home/pi/Desktop/raspi-interface/husk.png'  # Replace with your image path
+    input_image = cv2.imread(image_path)
+    
+    if input_image is not None:
+        result_image, total_objects, full_grains, broken_grains, stones, husk = process_image(input_image)
+        
+        print(f"Total objects: {total_objects}")
+        print(f"Full grains: {full_grains}")
+        print(f"Broken grains: {broken_grains}")
+        print(f"Stones: {stones}")
+        print(f"Husk: {husk}")
+        
+        # Display the result
+        cv2.imshow('Processed Image', result_image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    else:
+        print("Failed to load image")
