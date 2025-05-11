@@ -9,7 +9,7 @@ def detect_and_count_rice_grains(original_image):
         original_image (numpy array): Input image containing rice grains.
         
     Returns:
-        tuple: Processed image, full rice mask, broken rice mask, full grain count, broken grain count, and average rice area.
+        tuple: Processed image, full grain count, broken grain count, and average rice area.
     """
     if original_image is None:
         raise ValueError("Could not read image")
@@ -17,21 +17,21 @@ def detect_and_count_rice_grains(original_image):
     # Create a copy of the original image for visualization
     visualization_copy = original_image.copy()
     
+    # Convert to HSV for processing 
+    hsv = cv2.cvtColor(original_image,cv2.COLOR_BGR2HSV)
+
     # Convert to grayscale for processing
-    grayscale_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
+    grayscale_image = cv2.cvtColor(hsv, cv2.COLOR_BGR2GRAY)
     
     # Thresholding to create a binary image
     _, binary_image = cv2.threshold(
         grayscale_image, 0, 255, 
         cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     
-    # Invert the binary image to highlight rice grains
-    inverted_binary = cv2.bitwise_not(binary_image)
-    
     # Morphological operations to clean the image
     morphological_kernel = np.ones((3, 3), np.uint8)
-    cleaned_image = cv2.morphologyEx(inverted_binary, cv2.MORPH_OPEN, morphological_kernel, iterations=2)
-    
+    cleaned_image = cv2.morphologyEx(binary_image, cv2.MORPH_OPEN, morphological_kernel, iterations=2)
+
     # Background extraction
     background = cv2.dilate(cleaned_image, morphological_kernel, iterations=3)
     
@@ -53,36 +53,24 @@ def detect_and_count_rice_grains(original_image):
     
     # Watershed segmentation
     markers = cv2.watershed(original_image, markers)
-    
     # Count unique regions (excluding background and boundaries)
     unique_markers = np.unique(markers)
     total_grain_count = len(unique_markers) - 2  # Subtract background and boundary
     
     # Initialize counters and storage for full and broken grains
     full_grain_count = 0
+    broken_25_count = 0
+    broken_50_count = 0
+    broken_75_count = 0
     broken_grain_count = 0
-    total_area = 0
-    valid_contour_count = 0
-    
-    # Lists to store full and broken grain contours
-    full_contours = []
-    broken_contours = []
-    
-    # Calculate average area of rice grains
-    for label in unique_markers:
-        if label <= 1:  # Skip background and boundary
-            continue
-        grain_mask = np.zeros(grayscale_image.shape, dtype="uint8")
-        grain_mask[markers == label] = 255
-        contours, _ = cv2.findContours(grain_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        if contours:
-            area = cv2.contourArea(contours[0])
-            total_area += area
-            valid_contour_count += 1
+    percentage_list = {}
+    chalky_count =0
+    black_count = 0
+    yellow_count = 0
+    brown_count = 0
     
     # Calculate average area of rice grains
-    average_rice_area = total_area / valid_contour_count if valid_contour_count > 0 else 0
+    average_rice_area = 160
     
     # Classify grains as full or broken based on shape and size
     for label in unique_markers:
@@ -94,6 +82,38 @@ def detect_and_count_rice_grains(original_image):
         
         if contours:
             area = cv2.contourArea(contours[0])
+            M = cv2.moments(contours[0])
+            if M["m00"] != 0:
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+                
+                # Extract the pixel values in a circle with a radius of 3 pixels
+                circle_radius = 3
+                circle_mask = np.zeros(original_image.shape[:2], dtype=np.uint8)
+                cv2.circle(circle_mask, (cX, cY), circle_radius, 1, -1)  # Create a filled circle mask
+                
+                # Extract the pixel values from the original image using the mask
+                masked_pixels = original_image[circle_mask == 1]
+
+            # Extract the pixel values from the original image using the mask
+            contour_mask = np.zeros(original_image.shape[:2], dtype=np.uint8)
+            cv2.drawContours(contour_mask, contours, -1, 1, thickness=cv2.FILLED)  # Fill the contour
+            
+            # Extract the pixel values from the original image using the mask
+            masked_pixels = original_image[contour_mask == 1]
+            sorted_bgr = masked_pixels[np.lexsort((masked_pixels[:, 2], masked_pixels[:, 1], masked_pixels[:, 0]))]
+            masked_pixels = sorted_bgr[5:-5]
+            # Calculate the mean RGB value
+            
+            count_for_chalky = np.sum(np.all(masked_pixels >= [220, 200, 190], axis=1) & (np.abs(masked_pixels[:, 0] - masked_pixels[:, 2]) < 40))
+            count_for_black = np.sum(np.all(masked_pixels <= [150, 130, 140], axis=1))
+            count_for_yellow = np.sum(
+                (np.all(masked_pixels >= [155, 145, 145], axis=1) &
+                np.all(masked_pixels <= [200, 180, 180], axis=1)) &
+                (np.abs(masked_pixels[:, 0] - masked_pixels[:, 2]) < 30))
+            count_for_brown = np.sum(
+                    np.all(masked_pixels >= [95, 75, 105], axis=1) &
+                    np.all(masked_pixels <= [110, 95, 125], axis=1))
             try:
                 # Calculate eccentricity for shape analysis
                 (center, (major_axis, minor_axis), angle) = cv2.fitEllipse(contours[0])
@@ -110,125 +130,135 @@ def detect_and_count_rice_grains(original_image):
                 total_grain_count += grain_multiplier
             
             # Classify as full or broken grain
-            if eccentricity >= 0.84 or area > 0.6 * average_rice_area:
+            if count_for_chalky>=4:
+                chalky_count+=1 + grain_multiplier
+                cv2.drawContours(visualization_copy, contours, -1, (0, 255, 255), thickness=cv2.FILLED)
+            elif count_for_brown >= 5 :
+                brown_count += 1 + grain_multiplier
+                cv2.drawContours(visualization_copy, contours, -1, (0, 128, 255), thickness=cv2.FILLED)         
+            elif count_for_yellow >= 9:
+                yellow_count +=1 + grain_multiplier
+                cv2.drawContours(visualization_copy, contours, -1, (0, 102, 51), thickness=cv2.FILLED)
+            elif count_for_black >= 7:
+                black_count+=1 + grain_multiplier
+                cv2.drawContours(visualization_copy, contours, -1, (10, 10, 10), thickness=cv2.FILLED)
+            elif eccentricity >= 0.84 and area > 0.75 * average_rice_area:
                 full_grain_count += 1 + grain_multiplier
-                full_contours.extend(contours)
+                cv2.drawContours(visualization_copy, contours, -1, (0, 255, 0), thickness=cv2.FILLED) 
             else:
                 broken_grain_count += 1 + grain_multiplier
-                broken_contours.extend(contours)
+                area_ratio = area / average_rice_area
+                if area_ratio > 0.45:
+                    broken_25_count += 1
+                    cv2.drawContours(visualization_copy, contours, -1, (0, 0, 255), thickness=cv2.FILLED)
+                elif area_ratio > 0.3:
+                    broken_50_count += 1
+                    cv2.drawContours(visualization_copy, contours, -1, (0, 0, 255), thickness=cv2.FILLED)
+                else:
+                    broken_75_count += 1
+                    cv2.drawContours(visualization_copy, contours, -1, (0, 0, 255), thickness=cv2.FILLED)
+            percentage_list = {
+                '25%': broken_25_count,
+                '50%': broken_50_count,
+                '75%': broken_75_count
+            }
+                
     
-    # Create masks for visualization
-    full_rice_mask = np.zeros(grayscale_image.shape, dtype='uint8')
-    broken_rice_mask = np.zeros(grayscale_image.shape, dtype='uint8')
-    
-    if full_contours:
-        cv2.drawContours(full_rice_mask, full_contours, -1, 255, thickness=cv2.FILLED)
-    if broken_contours:
-        cv2.drawContours(broken_rice_mask, broken_contours, -1, 255, thickness=cv2.FILLED)
-
     return (
         visualization_copy,
-        full_rice_mask,
-        broken_rice_mask,
         full_grain_count,
         broken_grain_count,
-        average_rice_area
+        chalky_count,
+        black_count,
+        yellow_count,
+        brown_count,
+        percentage_list
     )
+
 
 def detect_stones(image):
     """
-    Detects stones in an image using HSV color space filtering.
-    
+    Detects stones in an image using HSV color space filtering and applies a dark blue mask.
+
     Args:
         image (numpy array): Input image containing potential stones.
-        
+
     Returns:
-        tuple: Stone mask, stone count, and total stone area.
+        tuple: Image with stones highlighted in dark blue, stone count, and total stone area.
     """
-    # Convert to HSV color space for better color segmentation
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    
-    # Define HSV range for stones (typically brownish-gray)
     lower_stone_color = np.array([5, 50, 50])
     upper_stone_color = np.array([25, 255, 200])
-    
-    # Create binary mask for stones
     stone_mask = cv2.inRange(hsv_image, lower_stone_color, upper_stone_color)
-    
-    # Morphological operations to clean the mask
     morphological_kernel = np.ones((3, 3), np.uint8)
     cleaned_stone_mask = cv2.morphologyEx(stone_mask, cv2.MORPH_CLOSE, morphological_kernel, iterations=2)
-    
-    # Create a mask for confirmed stones only
-    confirmed_stone_mask = np.zeros_like(stone_mask)
-    
-    # Find and analyze stone contours
     stone_contours, _ = cv2.findContours(cleaned_stone_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
+
     stone_count = 0
     total_stone_area = 0
-    
+    result_image = image.copy()
+
     for contour in stone_contours:
         area = cv2.contourArea(contour)
-        if area > 20:  # Filter small noise
-            if len(contour) >= 5:  # Ensure enough points for ellipse fitting
+        if area > 20:
+            if len(contour) >= 5:
                 ellipse = cv2.fitEllipse(contour)
                 (center, axes, angle) = ellipse
                 major_axis, minor_axis = max(axes), min(axes)
                 aspect_ratio = major_axis / minor_axis if minor_axis != 0 else 0
-                
-                # Validate stone shape using aspect ratio
                 if 1.0 <= aspect_ratio <= 2.0:
-                    cv2.drawContours(confirmed_stone_mask, [contour], 0, 255, -1)
                     stone_count += 1
                     total_stone_area += area
+                    mask = np.zeros(image.shape[:2], dtype=np.uint8)
+                    cv2.drawContours(mask, [contour], 0, 255, thickness=cv2.FILLED)
+                    # Use a larger kernel and more iterations for stronger dilation
+                    dilated_mask = cv2.dilate(mask, np.ones((7, 7), np.uint8), iterations=2)
+                    result_image[dilated_mask == 255] = (139, 0, 0)
 
-    return confirmed_stone_mask, stone_count, total_stone_area
+
+
+    return result_image, stone_count, total_stone_area
+
+
 
 def detect_husk(image):
     """
-    Detects husk in an image using HSV color space filtering.
-    
+    Detects husk in an image using HSV color space filtering and applies a dark blue mask.
+
     Args:
         image (numpy array): Input image containing potential husk.
-        
+
     Returns:
-        tuple: Husk mask, husk count, and total husk area.
+        tuple: Image with husk highlighted in dark blue, husk count, and total husk area.
     """
-    # Convert to HSV color space
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    
-    # Define HSV range for husk (light brown/yellowish)
     lower_husk_color = np.array([10, 30, 50])
     upper_husk_color = np.array([30, 180, 220])
-    
-    # Create binary mask for husk
     husk_mask = cv2.inRange(hsv_image, lower_husk_color, upper_husk_color)
-    
-    # Morphological operations to clean the mask
     morphological_kernel = np.ones((3, 3), np.uint8)
     cleaned_husk_mask = cv2.morphologyEx(husk_mask, cv2.MORPH_CLOSE, morphological_kernel, iterations=2)
-    
-    # Find and analyze husk contours
     husk_contours, _ = cv2.findContours(cleaned_husk_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-    clean_husk_mask = np.zeros_like(husk_mask)
+
     husk_count = 0
     total_husk_area = 0
-    
+    result_image = image.copy()
+
     for contour in husk_contours:
         area = cv2.contourArea(contour)
-        if area > 20:  # Filter small noise
+        if area > 20:
             x, y, width, height = cv2.boundingRect(contour)
             aspect_ratio = float(width) / height
-            
-            # Validate husk shape using aspect ratio
             if 0.2 < aspect_ratio < 0.7 or aspect_ratio > 1.5:
                 husk_count += 1
                 total_husk_area += area
-                cv2.drawContours(clean_husk_mask, [contour], -1, 255, -1)
+                mask = np.zeros(image.shape[:2], dtype=np.uint8)
+                cv2.drawContours(mask, [contour], -1, 255, thickness=cv2.FILLED)
+                dilated_mask = cv2.dilate(mask, np.ones((5, 5), np.uint8), iterations=1)
+                result_image[dilated_mask == 255] = (139, 0, 0)
 
-    return clean_husk_mask, husk_count, total_husk_area
+
+    return result_image, husk_count, total_husk_area
+
 
 def process_image(input_image):
     """
@@ -245,33 +275,27 @@ def process_image(input_image):
     
     # Create a copy of the original image for visualization
     result_image = input_image.copy()
+
+    stone_image, stone_count, stone_area = detect_stones(input_image)
+    husk_image, husk_count, husk_area = detect_husk(input_image)
+
+    stone_mask = cv2.inRange(stone_image, (139, 0, 0), (139, 0, 0))
+    result_image[stone_mask == 255] = [139, 0, 0]
+    husk_mask = cv2.inRange(husk_image, (139, 0, 0), (139, 0, 0))
+    result_image[husk_mask == 255] = [139, 0, 0]
     
     # Detect rice grains
-    _, full_rice_mask, broken_rice_mask, full_grain_count, broken_grain_count, average_rice_area = detect_and_count_rice_grains(input_image)
+    _, full_grain_count, broken_grain_count, chalky_count, black_count, yellow_count, brown_count, percent_list = detect_and_count_rice_grains(result_image)
     
-    # Detect stones
-    stone_mask, stone_count, stone_area = detect_stones(input_image)
-    
-    # Detect husk
-    husk_mask, husk_count, husk_area = detect_husk(input_image)
-    
-    # Apply masks to the result image with specific colors
-    result_image[full_rice_mask == 255] = [0, 255, 0]    # Green for full rice grains
-    result_image[broken_rice_mask == 255] = [0, 0, 255]  # Blue for broken rice grains
-    result_image[stone_mask == 255] = [0, 255, 255]      # Yellow for stones
-    result_image[husk_mask == 255] = [255, 0, 255]       # Pink for husk
-    
-    # Adjust full grain count by subtracting overlapping areas
-    overlapping_area = stone_area // average_rice_area + husk_area // average_rice_area
-    adjusted_full_grain_count = max(0, full_grain_count - overlapping_area)
-    
-    # Calculate total objects count
-    total_objects = adjusted_full_grain_count + broken_grain_count + stone_count + husk_count
     
     return (
         result_image,
-        int(total_objects),
-        int(adjusted_full_grain_count),
+        int(full_grain_count),
+        int(chalky_count) ,
+        int(black_count),
+        int(yellow_count),
+        int(brown_count),
+        percent_list,
         int(broken_grain_count),
         int(stone_count),
         int(husk_count)
@@ -283,13 +307,19 @@ if __name__ == "__main__":
     input_image = cv2.imread(image_path)
     
     if input_image is not None:
-        result_image, total_objects, full_grains, broken_grains, stones, husk = process_image(input_image)
-        
-        print(f"Total objects: {total_objects}")
-        print(f"Full grains: {full_grains}")
-        print(f"Broken grains: {broken_grains}")
-        print(f"Stones: {stones}")
-        print(f"Husk: {husk}")
+        result_image, full_grain_count, chalky_count, black_count, yellow_count, brown_count, percent_list, broken_grain_count, stone_count, husk_count = process_image()
+
+    # Print the returned values
+        print("Result Image:", result_image)
+        print("Full Grain Count:", full_grain_count)
+        print("Chalky Count:", chalky_count)
+        print("Black Count:", black_count)
+        print("Yellow Count:", yellow_count)
+        print("Brown Count:", brown_count)
+        print("Percent List:", percent_list)
+        print("Broken Grain Count:", broken_grain_count)
+        print("Stone Count:", stone_count)
+        print("Husk Count:", husk_count)
         
         # Display the result
         cv2.imshow('Processed Image', result_image)

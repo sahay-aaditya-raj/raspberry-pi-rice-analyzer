@@ -25,7 +25,7 @@ app.config['PROCESSED_FOLDER'] = PROCESSED_FOLDER
 
 camera = Camera()
 
-MAX_IMAGES = 10
+MAX_IMAGES = 50
 
 def cleanup_old_images(directory, max_files=10):
     """Deletes the oldest image if the directory contains more than `max_files` images."""
@@ -74,8 +74,8 @@ def capture():
 @app.route('/process_image', methods=['POST'])
 def process_image_route():
     """
-    Processes an image by overlaying the selected label (Dal/Rice) and threshold value,
-    then stores the result in 'static/processed/' (keeping only the last 10 images).
+    Processes an image to detect and analyze rice grains, stones, and husks.
+    Returns detailed analysis results including different types of grains.
     """
     data = request.get_json()
     image_path = data.get("image_path")
@@ -90,25 +90,48 @@ def process_image_route():
     if image is None:
         return jsonify({"error": "Image not found"}), 404
 
-    # Process image: overlay label and threshold value
-    # processed_image = process_image(image, label, threshold_value)
-    processed_image = process_image(image)
-    final_image = processed_image[0]
-    # Save processed image with a timestamp-based filename
-    processed_filename = f"processed_{int(time.time())}.jpg"
-    processed_filepath = os.path.join(PROCESSED_FOLDER, processed_filename)
-    cv2.imwrite(processed_filepath, final_image)
+    # Process image with updated process_image function
+    try:
+        processed_result = process_image(image)
+        
+        # Unpack results from the tuple (updated to match new return values)
+        final_image = processed_result[0]
+        full_grain_count = processed_result[1]
+        chalky_count = processed_result[2]
+        black_count = processed_result[3]
+        yellow_count = processed_result[4]
+        brown_count = processed_result[5]
+        broken_percentages = processed_result[6]
+        broken_grain_count = processed_result[7]
+        stone_count = processed_result[8]
+        husk_count = processed_result[9]
 
-    # Cleanup old processed images (keep only 10)
-    cleanup_old_images(PROCESSED_FOLDER, max_files=10)
+        # Calculate total count
+        total_objects = full_grain_count + chalky_count + black_count + yellow_count + brown_count + broken_grain_count + stone_count + husk_count
 
-    return jsonify({"processed_image_url": url_for('static', filename=f'processed/{processed_filename}'), 
-                                                   "total_objects": processed_image[1],
-                                                   "full_grain_count": processed_image[2], 
-                                                   "broken_grain_count": processed_image[3],
-                                                   "stone_count": processed_image[4],
-                                                   "husk_count": processed_image[5]
-                                                   })
+        # Save processed image with a timestamp-based filename
+        processed_filename = f"processed_{int(time.time())}.jpg"
+        processed_filepath = os.path.join(PROCESSED_FOLDER, processed_filename)
+        cv2.imwrite(processed_filepath, final_image)
+
+        # Cleanup old processed images (keep only 50)
+        cleanup_old_images(PROCESSED_FOLDER, max_files=MAX_IMAGES)
+
+        return jsonify({
+            "processed_image_url": url_for('static', filename=f'processed/{processed_filename}'),
+            "total_objects": total_objects,
+            "full_grain_count": full_grain_count,
+            "chalky_count": chalky_count,
+            "black_count": black_count,
+            "yellow_count": yellow_count,
+            "brown_count": brown_count,
+            "broken_percentages": broken_percentages,
+            "broken_grain_count": broken_grain_count,
+            "stone_count": stone_count,
+            "husk_count": husk_count
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
