@@ -68,7 +68,13 @@ def detect_and_count_rice_grains(original_image):
     black_count = 0
     yellow_count = 0
     brown_count = 0
-    
+    full_contour = []
+    broken_contour =[]
+    chalky_contour =[]
+    black_contour =[]
+    yellow_contour =[]
+    brown_contour =[]
+
     # Calculate average area of rice grains
     average_rice_area = 160
     
@@ -133,21 +139,27 @@ def detect_and_count_rice_grains(original_image):
             if count_for_chalky>=4:
                 chalky_count+=1 + grain_multiplier
                 cv2.drawContours(visualization_copy, contours, -1, (0, 255, 255), thickness=cv2.FILLED)
-            elif count_for_brown >= 5 :
+                chalky_contour.append(contours)
+            elif count_for_brown >= 4 :
                 brown_count += 1 + grain_multiplier
-                cv2.drawContours(visualization_copy, contours, -1, (0, 128, 255), thickness=cv2.FILLED)         
-            elif count_for_yellow >= 9:
+                cv2.drawContours(visualization_copy, contours, -1, (0, 128, 255), thickness=cv2.FILLED)   
+                brown_contour.append(contours)      
+            elif count_for_yellow >= 8:
                 yellow_count +=1 + grain_multiplier
                 cv2.drawContours(visualization_copy, contours, -1, (0, 102, 51), thickness=cv2.FILLED)
-            elif count_for_black >= 7:
+                yellow_contour.append(contours)
+            elif count_for_black >= 8:
                 black_count+=1 + grain_multiplier
                 cv2.drawContours(visualization_copy, contours, -1, (10, 10, 10), thickness=cv2.FILLED)
+                black_contour.append(contours)
             elif eccentricity >= 0.84 and area > 0.75 * average_rice_area:
                 full_grain_count += 1 + grain_multiplier
                 cv2.drawContours(visualization_copy, contours, -1, (0, 255, 0), thickness=cv2.FILLED) 
+                full_contour.append(contours)
             else:
                 broken_grain_count += 1 + grain_multiplier
                 area_ratio = area / average_rice_area
+                brown_contour.append(contours)
                 if area_ratio > 0.45:
                     broken_25_count += 1
                     cv2.drawContours(visualization_copy, contours, -1, (0, 0, 255), thickness=cv2.FILLED)
@@ -172,7 +184,13 @@ def detect_and_count_rice_grains(original_image):
         black_count,
         yellow_count,
         brown_count,
-        percentage_list
+        percentage_list,
+        full_contour,
+        broken_contour,
+        yellow_contour,
+        black_contour,
+        brown_contour,
+        chalky_contour
     )
 
 
@@ -219,8 +237,6 @@ def detect_stones(image):
 
     return result_image, stone_count, total_stone_area
 
-
-
 def detect_husk(image):
     """
     Detects husk in an image using HSV color space filtering and applies a dark blue mask.
@@ -229,36 +245,43 @@ def detect_husk(image):
         image (numpy array): Input image containing potential husk.
 
     Returns:
-        tuple: Image with husk highlighted in dark blue, husk count, and total husk area.
+        tuple: Image with husk highlighted in dark blue, binary mask of husks,
+               number of detected husks, and total husk area.
     """
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    lower_husk_color = np.array([10, 30, 50])
-    upper_husk_color = np.array([30, 180, 220])
+    lower_husk_color = np.array([0, 10, 30])
+    upper_husk_color = np.array([40, 255, 255])
     husk_mask = cv2.inRange(hsv_image, lower_husk_color, upper_husk_color)
+
+    # Morphological operation to clean up the mask
     morphological_kernel = np.ones((3, 3), np.uint8)
     cleaned_husk_mask = cv2.morphologyEx(husk_mask, cv2.MORPH_CLOSE, morphological_kernel, iterations=2)
+
+    # Find contours
     husk_contours, _ = cv2.findContours(cleaned_husk_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     husk_count = 0
     total_husk_area = 0
     result_image = image.copy()
+    mask_output = np.zeros(image.shape[:2], dtype=np.uint8)
+
+    husk_contours_return =[]
 
     for contour in husk_contours:
         area = cv2.contourArea(contour)
-        if area > 20:
+        if area > 10:
             x, y, width, height = cv2.boundingRect(contour)
             aspect_ratio = float(width) / height
-            if 0.2 < aspect_ratio < 0.7 or aspect_ratio > 1.5:
+            if 0.2 < aspect_ratio < 5.0:
+                husk_contours_return.append(contour)
                 husk_count += 1
                 total_husk_area += area
-                mask = np.zeros(image.shape[:2], dtype=np.uint8)
-                cv2.drawContours(mask, [contour], -1, 255, thickness=cv2.FILLED)
-                dilated_mask = cv2.dilate(mask, np.ones((5, 5), np.uint8), iterations=1)
-                result_image[dilated_mask == 255] = (139, 0, 0)
+                cv2.drawContours(mask_output, [contour], -1, 255, thickness=cv2.FILLED)
+                # Highlight husks in result image
+                dilated_mask = cv2.dilate(mask_output, np.ones((7, 7), np.uint8), iterations=2)
+                result_image[dilated_mask == 255] = (220,7,13)
 
-
-    return result_image, husk_count, total_husk_area
-
+    return result_image, husk_count, husk_contours_return
 
 def process_image(input_image):
     """
@@ -274,43 +297,39 @@ def process_image(input_image):
         raise ValueError("Could not read image")
     
     # Create a copy of the original image for visualization
-    result_image = input_image.copy()
 
     stone_image, stone_count, stone_area = detect_stones(input_image)
-    husk_image, husk_count, husk_area = detect_husk(input_image)
+    husk_image, husk_count, husk_contours_return = detect_husk(input_image)
 
-    stone_mask = cv2.inRange(stone_image, (139, 0, 0), (139, 0, 0))
-    result_image[stone_mask == 255] = [139, 0, 0]
-    husk_mask = cv2.inRange(husk_image, (139, 0, 0), (139, 0, 0))
-    result_image[husk_mask == 255] = [139, 0, 0]
-    
     # Detect rice grains
-    _, full_grain_count, broken_grain_count, chalky_count, black_count, yellow_count, brown_count, percent_list = detect_and_count_rice_grains(result_image)
-    
-    
+    visual, full_grain_count, broken_grain_count, chalky_count, black_count, yellow_count, brown_count, percent_list, full_contour, broken_contour, yellow_contour, black_contour, brown_contour, chalky_contour = detect_and_count_rice_grains(husk_image)
+
+    # Draw husk contours on the visual image in pink
+    cv2.drawContours(visual, husk_contours_return, -1, (255, 192, 203), thickness=cv2.FILLED)  # Pink color
+
     return (
-        result_image,
+        visual,
         int(full_grain_count),
-        int(chalky_count) ,
+        int(chalky_count),
         int(black_count),
         int(yellow_count),
         int(brown_count),
         percent_list,
         int(broken_grain_count),
         int(stone_count),
-        int(husk_count)
+        int(husk_count),
     )
 
 # Test the function
 if __name__ == "__main__":
-    image_path = '/home/pi/Desktop/raspi-interface/husk.png'  # Replace with your image path
+    image_path = 'images/with_husk.jpg'  # Replace with your image path
     input_image = cv2.imread(image_path)
     
     if input_image is not None:
-        result_image, full_grain_count, chalky_count, black_count, yellow_count, brown_count, percent_list, broken_grain_count, stone_count, husk_count = process_image()
+        visual,full_grain_count, chalky_count, black_count, yellow_count, brown_count, percent_list, broken_grain_count, stone_count, husk_count = process_image(input_image)
 
     # Print the returned values
-        print("Result Image:", result_image)
+        print("Result Image:", visual)
         print("Full Grain Count:", full_grain_count)
         print("Chalky Count:", chalky_count)
         print("Black Count:", black_count)
@@ -322,7 +341,8 @@ if __name__ == "__main__":
         print("Husk Count:", husk_count)
         
         # Display the result
-        cv2.imshow('Processed Image', result_image)
+        cv2.imshow('Final image :', visual)
+        # cv2.imshow('After husk and stone ', result_image)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
     else:
