@@ -138,7 +138,7 @@ def detect_and_count_rice_grains(original_image):
             # Classify as full or broken grain
             if count_for_chalky>=4:
                 chalky_count+=1 + grain_multiplier
-                cv2.drawContours(visualization_copy, contours, -1, (0, 255, 255), thickness=cv2.FILLED)
+                cv2.drawContours(visualization_copy, contours, -1, (255, 255, 255), thickness=cv2.FILLED)
                 chalky_contour.append(contours)
             elif count_for_brown >= 4 :
                 brown_count += 1 + grain_multiplier
@@ -146,7 +146,7 @@ def detect_and_count_rice_grains(original_image):
                 brown_contour.append(contours)      
             elif count_for_yellow >= 8:
                 yellow_count +=1 + grain_multiplier
-                cv2.drawContours(visualization_copy, contours, -1, (0, 102, 51), thickness=cv2.FILLED)
+                cv2.drawContours(visualization_copy, contours, -1, (0, 255, 255), thickness=cv2.FILLED)
                 yellow_contour.append(contours)
             elif count_for_black >= 8:
                 black_count+=1 + grain_multiplier
@@ -231,7 +231,7 @@ def detect_stones(image):
                     cv2.drawContours(mask, [contour], 0, 255, thickness=cv2.FILLED)
                     # Use a larger kernel and more iterations for stronger dilation
                     dilated_mask = cv2.dilate(mask, np.ones((7, 7), np.uint8), iterations=2)
-                    result_image[dilated_mask == 255] = (139, 0, 0)
+                    result_image[dilated_mask == 255] = (255,255,0)
 
 
 
@@ -322,7 +322,7 @@ def process_image(input_image):
 
 # Test the function
 if __name__ == "__main__":
-    image_path = 'images/with_husk.jpg'  # Replace with your image path
+    image_path = 'images/allblack1.jpg'  # Replace with your image path
     input_image = cv2.imread(image_path)
     
     if input_image is not None:
