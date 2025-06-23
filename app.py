@@ -166,62 +166,6 @@ def process_image_route():
     Processes an image to detect and analyze rice grains, stones, and husks.
     Returns detailed analysis results including different types of grains.
     """
-    # data = request.get_json()
-    # image_path = data.get("image_path")
-
-    # if not image_path:
-    #     return jsonify({"error": "Invalid request"}), 400
-
-    # # Build full path to the image (remove any leading '/' if present)
-    # image_full_path = os.path.join(app.root_path, image_path.lstrip('/'))
-    
-    # image = cv2.imread(image_full_path)
-    # if image is None:
-    #     return jsonify({"error": "Image not found"}), 404
-
-    # # Import process_image lazily to avoid import errors at startup
-    # try:
-    #     from process_image import process_image
-    #     processed_result = process_image(image)
-        
-    #     # Unpack results from the tuple (updated to match new return values)
-    #     final_image = processed_result[0]
-    #     full_grain_count = processed_result[1]
-    #     chalky_count = processed_result[2]
-    #     black_count = processed_result[3]
-    #     yellow_count = processed_result[4]
-    #     brown_count = processed_result[5]
-    #     broken_percentages = processed_result[6]
-    #     broken_grain_count = processed_result[7]
-    #     stone_count = processed_result[8]
-    #     husk_count = processed_result[9]
-
-    #     # Calculate total count
-    #     total_objects = full_grain_count + chalky_count + black_count + yellow_count + brown_count + broken_grain_count + stone_count + husk_count
-
-    #     # Save processed image with a timestamp-based filename
-    #     processed_filename = f"processed_{int(time.time())}.jpg"
-    #     processed_filepath = os.path.join(PROCESSED_FOLDER, processed_filename)
-    #     cv2.imwrite(processed_filepath, final_image)
-
-    #     # Cleanup old processed images (keep only 50)
-    #     cleanup_old_images(PROCESSED_FOLDER, max_files=MAX_IMAGES)
-
-    #     return jsonify({
-    #         "processed_image_url": url_for('static', filename=f'processed/{processed_filename}'),
-    #         "total_objects": total_objects,
-    #         "full_grain_count": full_grain_count,
-    #         "chalky_count": chalky_count,
-    #         "black_count": black_count,
-    #         "yellow_count": yellow_count,
-    #         "brown_count": brown_count,
-    #         "broken_percentages": broken_percentages,
-    #         "broken_grain_count": broken_grain_count,
-    #         "stone_count": stone_count,
-    #         "husk_count": husk_count
-    #     })
-    # except Exception as e:
-    #     return jsonify({"error": str(e)}), 500
     data = request.get_json()
     image_path = data.get("image_path")
 
@@ -501,19 +445,7 @@ if __name__ == '__main__':
         mac_address = ':'.join(['{:02x}'.format((mac >> ele) & 0xff) for ele in range(40, -1, -8)])
         return mac_address
     
-    # Make sure loopback interface is ready
     ensure_loopback_available()
     
-    # # Check MAC address if not in offline mode
-    # if os.environ.get('FLASK_OFFLINE_MODE') != '1':
-    #     mac = get_mac_address()
-    #     print(f"Current MAC Address: {mac}")
-        
-    #     if mac != MAC_ADDRESS:
-    #         print("MAC address does not match with original. Exiting...")
-    #         exit(1)
-    # else:
-    #     print("Running in offline mode - skipping MAC check")
-        
-    # Start Flask app with specific host bindings to ensure localhost works
+
     app.run(debug=True, host="0.0.0.0", port=5000, use_reloader=False, threaded=True)
